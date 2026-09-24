@@ -854,4 +854,102 @@ Así se cierra la limitación del Paso 5: ahora Claude puede **ver y probar** el
 
 ---
 
-*(Continúa en el Paso 11)*
+## Paso 11 — Cierre
+
+### Lo que se ha construido
+Un Snake jugable (React + Vite, 32 tests, lint limpio) y, sobre todo, un proyecto **preparado para trabajar
+con Claude Code**. Estos son los archivos que lo configuran:
+
+```
+snake-game/
+├── CLAUDE.md                        ← Paso 3: instrucciones de la casa (siempre en contexto)
+├── .mcp.json                        ← Paso 10: servidor MCP de Playwright (navegador)
+└── .claude/
+    ├── settings.json                ← Paso 4: permisos · Paso 9: hooks
+    ├── settings.local.json          ← tus ajustes personales (fuera de git)
+    ├── skills/
+    │   ├── check/SKILL.md           ← Paso 7: /check (tests + lint + veredicto)
+    │   └── nueva-regla/SKILL.md     ← Paso 7: flujo para cambiar reglas del juego
+    ├── agents/
+    │   └── revisor.md               ← Paso 8: subagente revisor de código
+    └── hooks/
+        └── lint-archivo.mjs         ← Paso 9: oxlint al editar archivos de src/
+```
+
+### Resumen: qué pieza usar para qué
+| Quiero... | Pieza | Quién la activa |
+|-----------|-------|-----------------|
+| Que Claude conozca el proyecto y sus normas | `CLAUDE.md` | Siempre cargado |
+| Controlar qué puede hacer sin preguntar | Permisos (`settings.json`) | Claude Code |
+| Guardar un flujo de trabajo o una orden repetida | **Skill** | Tú (`/nombre`) o Claude |
+| Delegar una tarea que lee mucho y devuelve poco | **Subagente** | Claude (o tú se lo pides) |
+| Que algo pase **siempre**, sin depender de Claude | **Hook** | Claude Code, ante un evento |
+| Dar a Claude herramientas nuevas (navegador, APIs...) | **MCP** | Claude, cuando le hacen falta |
+| Que Claude compruebe su propio trabajo | Tests + `npm test` | Claude, antes de terminar |
+
+> 💡 Regla general: empieza por `CLAUDE.md`. Cuando repitas algo, conviértelo en skill. Cuando algo no deba
+> fallar nunca, conviértelo en hook.
+
+### Lecciones del camino
+- **Planifica antes de programar** (Paso 1): el plan evita rehacer trabajo.
+- **Git es tu red de seguridad** (Pasos 2 y 6): cada paso es un commit y cualquier cambio se puede deshacer.
+- **Los tests le dan a Claude un objetivo comprobable** (Paso 6), y romper el código a propósito demuestra
+  que los tests sirven.
+- **Abre Claude Code desde la carpeta del proyecto** (Paso 7): si no, no carga ni `CLAUDE.md` ni `.claude/`.
+- **Subagentes y MCPs se cargan al arrancar** (Pasos 8 y 10): tras crearlos, `/exit` y `claude --continue`.
+- **`!` no sirve para comandos que no terminan (`npm run dev`) ni para `sudo`** (Pasos 6 y 10): usa otra terminal.
+- **Los errores son parte del proceso**: casi todos los pasos tuvieron un tropiezo, y leer el mensaje de
+  error fue siempre lo que llevó a la solución.
+
+### Chuleta de Claude Code
+
+**Arrancar y retomar**
+| Comando | Qué hace |
+|---------|----------|
+| `cd ~/PROYECTS/snake-game && claude` | Abrir Claude Code en el proyecto |
+| `claude --continue` | Retomar la última conversación de esta carpeta |
+| `claude --resume` o `/resume` | Elegir qué conversación retomar |
+| `/exit` | Salir |
+
+**Mientras trabajas**
+| Atajo | Qué hace |
+|-------|----------|
+| `Esc` | Interrumpir a Claude (lo hecho se queda hecho) |
+| `Esc` `Esc` | Volver a un mensaje anterior (`/rewind`) |
+| `Shift+Tab` | Cambiar de modo: normal → aceptar ediciones → plan mode |
+| `@archivo` | Mencionar un archivo para que Claude lo lea |
+| `! comando` | Ejecutar un comando de terminal (que termine y sin `sudo`) |
+| `/` | Ver todos los comandos, incluidos los tuyos |
+
+**Comandos**
+| Comando | Qué hace |
+|---------|----------|
+| `/init` | Crear un `CLAUDE.md` analizando el proyecto |
+| `/memory` | Ver y editar la memoria (`CLAUDE.md`) |
+| `/permissions` | Ver y editar los permisos |
+| `/agents` | Ver, crear y editar subagentes |
+| `/hooks` | Ver los hooks activos |
+| `/mcp` | Ver, activar y reconectar servidores MCP |
+| `/context` | Ver cuánto contexto ocupa cada cosa |
+| `/compact` | Resumir la conversación para liberar contexto |
+| `/clear` | Empezar una conversación limpia |
+| `/model` | Cambiar de modelo |
+| `/config` · `/status` | Ajustes generales · versión y configuración cargada |
+
+**De este proyecto**
+| Comando | Qué hace |
+|---------|----------|
+| `/check` | Tests + lint + "¿listo para commit?" |
+| `/nueva-regla <regla>` | Añadir una mecánica al juego con test primero |
+| *"usa el revisor"* | Revisión de código con el subagente |
+| *"abre el juego y pruébalo"* | Claude juega en el navegador (necesita `npm run dev` abierto) |
+
+### ¿Y ahora qué?
+El onboarding termina aquí, pero el Snake puede seguir creciendo. Todo lo aprendido se aplica ya:
+- *"Haz que la velocidad aumente cada 5 puntos"* → Claude cargará la skill `nueva-regla` (test primero).
+- *"Usa el revisor para revisar los cambios"* → subagente.
+- *"Abre el juego y comprueba que funciona"* → MCP de Playwright.
+- `/check` y commit.
+
+Otras ideas: atravesar paredes, obstáculos, niveles, controles táctiles para móvil o publicar el juego en
+GitHub Pages.
