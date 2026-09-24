@@ -755,4 +755,103 @@ Decisiones:
 
 ---
 
-*(Continúa en el Paso 10)*
+## Paso 10 — MCPs
+
+### El problema
+Hasta ahora Claude solo podía **leer código y ejecutar comandos**. Nunca había *visto* el juego: en el Paso 5
+lo "comprobó" renderizándolo en Node y contando celdas, y la prueba visual la tenías que hacer tú.
+
+### Qué es un MCP
+**MCP** (*Model Context Protocol*) es un estándar para conectar Claude con herramientas externas. Un
+**servidor MCP** es un programa que le ofrece a Claude **herramientas nuevas**: abrir un navegador, leer tu
+Gmail, consultar una base de datos...
+
+Es como instalarle un **plugin**: Claude Code arranca el servidor, le pregunta qué herramientas tiene y a
+partir de ahí Claude las usa como las suyas (`Read`, `Bash`...). Aparecen con el prefijo `mcp__<servidor>__`,
+por ejemplo `mcp__playwright__browser_navigate`.
+
+| Tipo | Cómo funciona | Ejemplo en este proyecto |
+|------|---------------|--------------------------|
+| **stdio** (local) | Un programa en tu máquina, arrancado por Claude Code | Playwright (`npx @playwright/mcp`) |
+| **http** (remoto) | Un servicio en internet | Gmail, Google Drive, Calendar (conectados desde claude.ai) |
+
+### Dónde se configuran
+| Ámbito | Archivo | Comando |
+|--------|---------|---------|
+| Proyecto (compartido por git) | `.mcp.json` | `claude mcp add --scope project ...` |
+| Solo tú, este proyecto | `~/.claude.json` | `claude mcp add --scope local ...` (por defecto) |
+| Solo tú, todos tus proyectos | `~/.claude.json` | `claude mcp add --scope user ...` |
+
+Comandos útiles: `claude mcp list` (estado de todos), `claude mcp get <nombre>`, y dentro de Claude Code
+**`/mcp`** (ver, activar, reconectar).
+
+### Nuestro MCP: Playwright (un navegador para Claude)
+```
+claude mcp add --scope project playwright -- npx @playwright/mcp@latest --headless --browser chromium
+```
+Genera este `.mcp.json`:
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--headless", "--browser", "chromium"]
+    }
+  }
+}
+```
+- **No toca `package.json`**: `npx` descarga el servidor aparte. No es una dependencia del juego.
+- **`--headless`**: el navegador funciona sin ventana (en WSL no hay pantalla).
+- **`--browser chromium`**: usa Chromium en vez de Google Chrome (ver tropiezos).
+
+### Los tropiezos (fueron unos cuantos)
+Instalar un MCP local es lo más delicado de todo el onboarding. Esto es lo que falló, en orden:
+
+1. **Faltaban librerías del sistema.** Chromium necesita `libnss3`, `libnspr4` y `libasound2t64`.
+   Se detectó con `ldd <ejecutable> | grep "not found"`. Instalarlas necesita `sudo`:
+   ```
+   sudo apt-get install -y libnss3 libnspr4 libasound2t64
+   ```
+   > ⚠️ `! sudo ...` **no funciona** dentro de Claude Code: `sudo` pide la contraseña y el `!` no deja
+   > escribirla. Los comandos con `sudo` van en **otra terminal**.
+2. **El servidor aparecía como "Rejected".** Al detectar un `.mcp.json` nuevo, Claude Code pregunta si
+   confías en él (ejecuta programas en tu máquina). Quedó rechazado en `.claude/settings.local.json`
+   (`disabledMcpjsonServers`). Se cambió a `enabledMcpjsonServers`. Desde `/mcp` también se puede.
+3. **Reiniciar para ver las herramientas.** Como con los subagentes: los MCP se cargan al arrancar la sesión.
+4. **Buscaba Google Chrome** en `/opt/google/chrome/chrome`. Por defecto el MCP usa Chrome, no Chromium.
+   Se añadió `--browser chromium` y se reconectó desde `/mcp` → *Reconnect* (sin reiniciar).
+5. **Versión de navegador distinta.** Se había descargado Chromium con `npx playwright install`, pero el MCP
+   usa otra versión de Playwright y esperaba otra build. La solución fue usar el instalador **del propio MCP**:
+   ```
+   npx @playwright/mcp@latest install-browser chrome-for-testing
+   ```
+6. **Las capturas se guardan dentro del proyecto**, en `.playwright-mcp/`. Se añadió a `.gitignore`.
+
+### Resultado: Claude jugando al Snake
+Con el servidor de desarrollo abierto (`npm run dev`), Claude:
+1. **Abrió** http://localhost:5173 e hizo una captura: tablero 20×20, serpiente, comida, marcador y botón
+   "Empezar". Consola sin errores.
+2. **Jugó** con un "piloto automático" de pocas líneas ejecutado en la página (`browser_evaluate`): en cada
+   paso lee la posición de la cabeza y de la comida y pulsa la flecha adecuada. Resultado:
+   | Puntos | Largo |
+   |--------|-------|
+   | 0 | 3 |
+   | 1 | 4 |
+   | 2 | 5 |
+   | 3 | 6 |
+3. **Comprobó el game over**: al terminar el piloto, la serpiente siguió recta y chocó contra la pared.
+4. **Comprobó la pausa**: game over → Espacio → partida nueva → Espacio → "Pausa" con la serpiente quieta →
+   Espacio → se mueve otra vez.
+5. **Recargó la página**: el récord seguía en 3 (guardado en `localStorage` como `snake-best`).
+
+> 💡 **Un falso fallo**: la primera prueba de la pausa "falló". Entre dos acciones de Claude pasan unos
+> segundos, y en ese tiempo la serpiente ya había chocado, así que el Espacio empezaba otra partida en vez de
+> pausar. La solución fue hacer la prueba entera dentro de la página, sin esperas. Antes de dar un fallo por
+> bueno, conviene comprobar que la prueba mide lo que crees.
+
+Así se cierra la limitación del Paso 5: ahora Claude puede **ver y probar** el juego, no solo el código.
+
+---
+
+*(Continúa en el Paso 11)*

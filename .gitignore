@@ -26,3 +26,6 @@ dist-ssr
 # Claude Code (configuración personal, no compartir)
 .claude/settings.local.json
 CLAUDE.local.md
+
+# Capturas y registros del MCP de Playwright
+.playwright-mcp/
