@@ -325,4 +325,55 @@ automáticamente en `.claude/settings.local.json`.
 
 ---
 
-*(Continúa en el Paso 5)*
+## Paso 5 — Programar el juego
+
+Se divide en tres partes: **5a** lógica, **5b** hook de React, **5c** componentes.
+
+### 5a — La lógica (`src/game/`)
+
+**`constants.js`**: tamaño del tablero (20), velocidad (150 ms por tick), longitud inicial (3),
+vectores de dirección, direcciones opuestas y los estados posibles del juego
+(`ready`, `playing`, `paused`, `gameOver`, `won`).
+
+**`logic.js`**: cuatro funciones **puras**, sin React y sin modificar nada; reciben un estado y devuelven uno nuevo.
+
+| Función | Qué hace |
+|---------|----------|
+| `createInitialState()` | Serpiente de 3 en el centro mirando a la derecha, comida al azar |
+| `changeDirection(state, dir)` | Cambia la dirección, salvo si es un giro de 180° |
+| `step(state)` | Avanza un tick: mueve, come y crece, detecta choques |
+| `randomFood(snake)` | Elige una celda libre al azar, o `null` si el tablero está lleno |
+
+Forma del estado:
+```js
+{
+  size: 20,
+  snake: [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }], // snake[0] es la cabeza
+  direction: 'RIGHT',      // dirección del último movimiento
+  nextDirection: 'RIGHT',  // dirección pedida por el jugador (se aplica en el siguiente tick)
+  food: { x: 5, y: 3 },
+  score: 0,
+  status: 'ready',
+}
+```
+
+Detalles de diseño que evitan bugs clásicos del Snake:
+- **Doble tecla rápida:** si vas a la derecha y pulsas ↑ y ← muy rápido, sin cuidado la serpiente
+  daría media vuelta y se mordería. Por eso el giro de 180° se compara con `direction` (el último
+  movimiento real) y no con `nextDirection`.
+- **La cola se mueve:** si no comes, la cola deja su celda libre en ese mismo tick, así que la cabeza
+  puede entrar en ella. Por eso la colisión se comprueba contra el cuerpo **sin la cola**.
+- **Azar inyectable:** `random` es un parámetro (por defecto `Math.random`). En los tests se pasa
+  una función fija, como `() => 0`, y el resultado es predecible.
+- **Victoria:** si no queda ninguna celda libre para la comida, el estado pasa a `won`.
+
+**Verificación:** antes de los tests formales (Paso 6), Claude escribió un script temporal
+(fuera del proyecto, en su carpeta *scratchpad*) que simula jugadas: moverse, bloquear el giro de 180°,
+comer, chocar con la pared, morderse y tablero lleno. Todo correcto, y `npm run lint` sin errores.
+
+> 💡 **El ciclo de Claude Code:** escribir → **ejecutar para comprobar** → corregir si falla.
+> Un código que "parece correcto" no está terminado hasta que se ha comprobado.
+
+---
+
+*(Continúa en el Paso 5b)*
