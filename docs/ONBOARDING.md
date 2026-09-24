@@ -177,4 +177,63 @@ Claude modifica archivos de verdad. Con git:
 
 ---
 
-*(Continúa en el Paso 3)*
+## Paso 3 — `CLAUDE.md`: la memoria del proyecto
+
+### El problema
+Cada sesión de Claude Code empieza **sin recordar nada** de las anteriores. Sin ayuda, tendrías que
+repetir siempre "usa JavaScript, los tests se lanzan con `npm test`, la lógica va separada...".
+
+### La solución
+`CLAUDE.md` es un archivo Markdown que Claude Code **carga automáticamente al inicio de cada sesión**.
+Es el documento de bienvenida para alguien nuevo en el equipo: cómo funciona el proyecto y cómo se trabaja en él.
+
+### Dos formas de crearlo
+| Forma | Cuándo |
+|-------|--------|
+| `/init` | Claude analiza el código y genera un borrador. Ideal en proyectos existentes |
+| A mano | Proyectos nuevos o cuando ya tienes claras las reglas (nuestro caso) |
+
+Lo normal es combinarlas: `/init` para el borrador y luego editarlo a mano.
+
+### Qué poner (y qué no)
+✅ **Sí:**
+- Comandos (cómo arrancar, testear, hacer lint).
+- Decisiones de arquitectura que no son obvias leyendo el código.
+- Convenciones del equipo ("no añadir dependencias sin preguntar").
+- El flujo de trabajo esperado ("pasa los tests antes de terminar").
+- Trampas del proyecto (ej.: "usamos oxlint, no ESLint").
+
+❌ **No:**
+- Cosas que Claude deduce leyendo el código.
+- Documentación larga: todo lo que hay en `CLAUDE.md` ocupa contexto en **cada** conversación.
+- Secretos o contraseñas.
+
+> Regla práctica: si te ves corrigiendo a Claude en lo mismo dos veces, eso va al `CLAUDE.md`.
+
+### Jerarquía de memoria
+Claude Code lee varios `CLAUDE.md` y los combina:
+
+| Archivo | Alcance | ¿Va en git? |
+|---------|---------|-------------|
+| `~/.claude/CLAUDE.md` | Todos tus proyectos (tus preferencias personales) | No |
+| `./CLAUDE.md` | Este proyecto, compartido con el equipo | **Sí** |
+| `./CLAUDE.local.md` | Este proyecto, solo para ti | No (añádelo al `.gitignore`) |
+| `subcarpeta/CLAUDE.md` | Se carga cuando Claude trabaja en esa carpeta | Sí |
+
+### Trucos
+- `/memory` → ver y editar los archivos de memoria cargados.
+- Puedes importar otros archivos con `@ruta`, p. ej. `@docs/arquitectura.md`. Úsalo con
+  cuidado: lo importado también ocupa contexto siempre.
+- También puedes pedírselo a Claude: *"añade al CLAUDE.md que..."*.
+
+### Nuestro `CLAUDE.md`
+Secciones: **Comandos**, **Arquitectura** (lógica pura en `src/game/`, el hook como único puente,
+componentes solo de presentación), **Convenciones** (JS, sin dependencias nuevas sin preguntar,
+estilo minimalista, español) y **Flujo de trabajo** (tests + lint antes de terminar, actualizar esta guía).
+
+Fíjate en que describe carpetas que **todavía no existen** (`src/game/`, `src/hooks/`). No pasa nada:
+así, cuando Claude programe el juego en el Paso 5, ya sabrá dónde va cada cosa.
+
+---
+
+*(Continúa en el Paso 4)*
