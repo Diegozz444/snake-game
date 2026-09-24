@@ -469,4 +469,60 @@ Detalles:
 
 ---
 
-*(Continúa en el Paso 6)*
+## Paso 6 — Tests: que Claude verifique su propio trabajo
+
+### ¿Por qué son tan importantes con Claude Code?
+En el Paso 5 Claude verificó el código con **scripts temporales** que luego se borraban. Los tests son esa
+misma verificación, pero **permanente**:
+- Cada vez que alguien cambie algo, `npm test` dice en un segundo si se ha roto algo.
+- Le dan a Claude un **objetivo claro y comprobable**: si le pides una mejora y los tests siguen en verde,
+  sabe que no ha roto lo anterior.
+- El `CLAUDE.md` lo exige: *"antes de dar una tarea por terminada, `npm test` debe pasar"*.
+
+### Qué se testea
+| Archivo | Tests | Qué cubre |
+|---------|-------|-----------|
+| `src/game/logic.test.js` | 19 | Estado inicial, giros (incluido el de 180° y la doble tecla rápida), movimiento, comer, choques con las 4 paredes y consigo misma, entrar en la casilla de la cola, victoria, comida en celda libre |
+| `src/hooks/useSnakeGame.test.js` | 13 | Todas las transiciones del `reducer`: `SPACE`, `TURN` y `TICK`, y el récord |
+
+No se testean los componentes: solo pintan lo que reciben y no tienen reglas. Probarlos exigiría un
+navegador simulado (una dependencia nueva) y aportaría poco.
+
+### Trucos que hacen los tests fáciles
+- **Funciones puras**: entra un estado, sale otro. Sin navegador, sin esperas, sin mocks.
+- **Azar inyectado**: `createInitialState(10, () => 0)` siempre da el mismo resultado.
+- **Tablero pequeño** (10×10, o 2×2 para la victoria): los casos límite son fáciles de montar.
+- **Helpers** como `playing({ ... })`: crean un estado en juego y solo cambias lo que importa en cada test.
+- **`it.each`**: un mismo test con varios datos (las 4 paredes, los estados de `SPACE`...).
+
+### La prueba de fuego: romper el código a propósito
+Un test que nunca falla no sirve para nada. Claude borró la regla del giro de 180° en `changeDirection`
+y ejecutó `npm test`:
+
+```
+× ignora el giro de 180°
+× no permite media vuelta con dos teclas rápidas en el mismo tick
+AssertionError: expected 'LEFT' to be 'RIGHT'
+Tests  2 failed | 17 passed (19)
+```
+
+Los tests detectaron el fallo al momento y dijeron **qué** se esperaba y **qué** llegó. Después se restauró
+el archivo con `git checkout -- src/game/logic.js` y todo volvió a verde. (Otra razón para usar git.)
+
+### Un tropiezo: `!` con procesos que no terminan
+A mitad de este paso se lanzó `! npm run dev` dentro de Claude Code. El servidor **no termina nunca**,
+así que la sesión se quedó bloqueada esperándolo y, al interrumpirla, se cortó el trabajo.
+
+> 💡 El prefijo `!` es para comandos que **terminan** (`git status`, `npm test`, `ls`). Para procesos que se
+> quedan corriendo, como `npm run dev`, usa **otra terminal** (en VS Code: `` Ctrl+` ``).
+
+> 💡 **Retomar una sesión**: `claude --continue` (o `/resume`) recupera la última conversación. Si empiezas
+> una nueva, basta con decir *"me quedé en los tests"*: Claude lee `git status`, el historial de commits y
+> esta guía, y reconstruye dónde estaba.
+
+### Resultado
+`npm test` → **32 tests en verde** · `npm run lint` → sin errores.
+
+---
+
+*(Continúa en el Paso 7)*
