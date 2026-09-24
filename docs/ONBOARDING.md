@@ -525,4 +525,70 @@ así que la sesión se quedó bloqueada esperándolo y, al interrumpirla, se cor
 
 ---
 
-*(Continúa en el Paso 7)*
+## Paso 7 — Slash commands y skills
+
+### El problema
+Hay instrucciones que repites a menudo: *"pasa los tests y el lint y dime si puedo hacer commit"*.
+Escribirlas cada vez es lento, y cada vez las dirás de forma distinta.
+
+### Skills = slash commands
+Una **skill** es una carpeta con un archivo `SKILL.md`: instrucciones guardadas que Claude carga
+**solo cuando hacen falta**. A diferencia de `CLAUDE.md`, que ocupa contexto siempre, de cada skill
+solo se carga su `description`. El resto se lee cuando se usa.
+
+Cada skill se convierte también en un **slash command**: `.claude/skills/check/` → `/check`.
+
+> 💡 Antes existía `.claude/commands/<nombre>.md` para los comandos. Sigue funcionando, pero ahora
+> se usan skills porque pueden hacer lo mismo y más, como incluir varios archivos o que Claude las active sola.
+
+| Dónde | Alcance |
+|-------|---------|
+| `.claude/skills/<nombre>/SKILL.md` | Este proyecto, compartida con el equipo vía git |
+| `~/.claude/skills/<nombre>/SKILL.md` | Todos tus proyectos, solo para ti |
+
+### Anatomía de un `SKILL.md`
+```markdown
+---
+name: check                         ← nombre del comando (/check)
+description: Ejecuta los tests...   ← Claude la lee para decidir cuándo usarla
+disable-model-invocation: true      ← solo la lanzas tú, Claude nunca por su cuenta
+allowed-tools: Bash(npm test), ...  ← permisos extra mientras se ejecuta
+argument-hint: "[regla]"            ← pista que ves al escribir el comando
+---
+Instrucciones en Markdown. $ARGUMENTS = lo que escribas tras el comando.
+!`git status --short`  ← se ejecuta ANTES y su salida se inserta en el texto
+```
+
+### Dos tipos de skill (las dos están en este proyecto)
+| | `/check` | `nueva-regla` |
+|---|----------|---------------|
+| ¿Quién la activa? | **Solo tú**, escribiendo `/check` | **Claude, por su cuenta**, cuando la tarea encaja con la `description` (o tú con `/nueva-regla ...`) |
+| Clave | `disable-model-invocation: true` | Una `description` que explica **cuándo** usarla |
+| Qué hace | Lanza `npm test` + `npm run lint` y da un veredicto, **sin tocar archivos** | Impone el flujo del proyecto: test que falla → implementar → verificar → documentar |
+| Por qué ese tipo | Es una acción que decides tú, en el momento que tú quieras | Es una forma de trabajar que Claude debe seguir siempre que cambie el juego |
+
+Detalles de diseño:
+- **`/check` inyecta `git status`** con `` !`...` ``: Claude ya ve qué archivos han cambiado sin gastar un paso en preguntarlo.
+- **`/check` no arregla nada**: solo informa. Una skill que "solo mira" no debe tener efectos inesperados.
+- **`nueva-regla` pide que el test falle primero**: si un test nuevo pasa antes de escribir el código, no está
+  probando nada nuevo (la misma idea que al romper el código en el Paso 6).
+
+### Cómo usarlas
+- `/check` → resumen de tests y lint.
+- `/nueva-regla la velocidad aumenta cada 5 puntos` → la lanzas tú con un argumento.
+- *"Haz que la serpiente pueda atravesar las paredes"* → Claude reconoce que es una regla del juego y carga `nueva-regla` sola.
+- Escribe `/` en Claude Code para ver todos los comandos, incluidos los tuyos.
+
+> 💡 Regla práctica: si le pides a Claude lo mismo por **tercera vez**, conviértelo en una skill.
+
+### Un tropiezo: "no me sale `/check`"
+Al probarlo, `/check` no aparecía. La sesión se había abierto desde `~` (la carpeta personal) y no desde
+el proyecto. Claude Code carga `CLAUDE.md`, `.claude/settings.json` y `.claude/skills/` **de la carpeta
+donde lo arrancas**, así que no veía nada del proyecto.
+
+> 💡 Abre siempre Claude Code **desde la carpeta del proyecto**: `cd ~/PROYECTS/snake-game && claude`.
+> Ojo: `claude --continue` retoma la última conversación **de esa carpeta**, no la última en general.
+
+---
+
+*(Continúa en el Paso 8)*
