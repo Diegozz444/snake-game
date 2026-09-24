@@ -374,6 +374,52 @@ comer, chocar con la pared, morderse y tablero lleno. Todo correcto, y `npm run 
 > 💡 **El ciclo de Claude Code:** escribir → **ejecutar para comprobar** → corregir si falla.
 > Un código que "parece correcto" no está terminado hasta que se ha comprobado.
 
+### 5b — El hook `useSnakeGame` (`src/hooks/useSnakeGame.js`)
+
+La lógica sabe **qué** pasa en cada movimiento; el hook decide **cuándo** y lo conecta con React.
+
+| Responsabilidad | Cómo |
+|-----------------|------|
+| Estado | `useReducer` con `{ game, best }` |
+| Reloj | `useEffect` + `setInterval` cada 150 ms, **solo** mientras `status === 'playing'` |
+| Teclado | `keydown` en `window`: flechas/WASD → `TURN`, Espacio → `SPACE` |
+| Récord | Se carga de `localStorage` al iniciar y se guarda cuando cambia |
+
+#### Acciones del reducer
+| Acción | Efecto |
+|--------|--------|
+| `TICK` | Llama a `step()` y actualiza el récord si hace falta |
+| `TURN` | Llama a `changeDirection()`; la primera flecha **arranca** la partida; se ignora en pausa o fin |
+| `SPACE` | ready → jugar · jugando → pausa · pausa → jugar · fin → partida nueva |
+
+#### Diagrama de estados
+```
+          flecha / espacio             espacio
+ ready ─────────────────────▶ playing ◀────────▶ paused
+                                 │
+                   choque        │   tablero lleno
+                 ┌───────────────┴──────────────┐
+                 ▼                              ▼
+             gameOver ──── espacio ────▶ (partida nueva, playing)
+                                                ▲
+                                   won ─────────┘ espacio
+```
+
+#### Decisiones
+- **`useReducer` en vez de varios `useState`**: todas las transiciones están en un solo sitio, y
+  como `reducer` se exporta, se puede probar sin navegador.
+- **El intervalo depende de `game.status`**: al pausar o morir se limpia (`clearInterval`) y al
+  volver a jugar se crea otro. Así no quedan intervalos "fantasma".
+- **`localStorage` dentro de `try/catch`**: en modo privado o con el almacenamiento bloqueado puede
+  fallar, y el juego tiene que seguir funcionando.
+- **`event.preventDefault()`**: evita que las flechas y el Espacio hagan scroll en la página.
+- **Nota sobre StrictMode**: en desarrollo React ejecuta el reducer dos veces para detectar efectos
+  secundarios. `step()` usa `Math.random` para la comida, pero no pasa nada: React se queda con uno
+  solo de los resultados y ambos parten del mismo estado.
+
+**Verificación:** script temporal que lanza acciones contra el `reducer` exportado y comprueba cada
+transición (ready → playing → paused → playing → gameOver → partida nueva). Lint sin errores.
+
 ---
 
-*(Continúa en el Paso 5b)*
+*(Continúa en el Paso 5c)*
