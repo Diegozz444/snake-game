@@ -236,4 +236,93 @@ así, cuando Claude programe el juego en el Paso 5, ya sabrá dónde va cada cos
 
 ---
 
-*(Continúa en el Paso 4)*
+## Paso 4 — La carpeta `.claude/` y los permisos
+
+### Dos carpetas `.claude`
+| Carpeta | Para qué |
+|---------|----------|
+| `~/.claude/` (tu home) | Configuración **personal y global**: tus ajustes, credenciales, historial, planes, checkpoints |
+| `./.claude/` (el proyecto) | Configuración **del proyecto**, compartida con el equipo vía git |
+
+Lo que hay en `~/.claude/`:
+```
+~/.claude/
+├── settings.json       ← tus ajustes globales (tema, permisos...)
+├── CLAUDE.md           ← tu memoria global (opcional)
+├── .credentials.json   ← tu sesión. ¡NUNCA compartir!
+├── plans/              ← planes creados en plan mode
+├── file-history/       ← checkpoints para /rewind
+├── projects/           ← historial de conversaciones y memoria por proyecto
+└── skills/             ← tus skills personales
+```
+
+Y lo que tendrá el `.claude/` del proyecto al final del onboarding:
+```
+.claude/
+├── settings.json        ← permisos y hooks del equipo (va en git)
+├── settings.local.json  ← tus ajustes personales en este proyecto (NO va en git)
+├── skills/              ← skills del proyecto (Paso 7)
+└── agents/              ← subagentes del proyecto (Paso 8)
+```
+
+### Precedencia de los settings (de más a menos prioridad)
+1. Políticas de empresa (si las hay)
+2. Argumentos de la línea de comandos
+3. `.claude/settings.local.json` → personal, este proyecto
+4. `.claude/settings.json` → equipo, este proyecto
+5. `~/.claude/settings.json` → personal, global
+
+### Permisos: `allow`, `ask`, `deny`
+Cada vez que Claude quiere usar una herramienta, Claude Code comprueba estas reglas:
+
+| Lista | Efecto |
+|-------|--------|
+| `allow` | Se ejecuta **sin preguntar** |
+| `ask` | **Siempre** pregunta, aunque otra regla lo permita |
+| `deny` | **Prohibido**, siempre gana a las demás |
+
+Nuestro `.claude/settings.json`:
+```json
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": ["Bash(npm run *)", "Bash(npm test)", "Bash(npm test *)",
+              "Bash(git status)", "Bash(git diff *)", "Bash(git log *)"],
+    "ask":   ["Bash(npm install *)", "Bash(git push *)"],
+    "deny":  ["Read(./.env)", "Read(./.env.*)"]
+  }
+}
+```
+
+Por qué cada regla:
+- **allow**: comandos seguros que Claude usa constantemente (tests, lint, build, ver el estado de git).
+  Así no te interrumpe cada dos por tres.
+- **ask**: instalar paquetes cambia las dependencias, y `git push` publica código. Mejor revisarlo.
+- **deny**: los `.env` suelen tener claves secretas. Claude no debe leerlos.
+- `$schema`: le da autocompletado y validación en VS Code.
+
+Sintaxis de las reglas: `Herramienta(patrón)`. Ejemplos: `Bash(npm run *)`, `Read(./src/**)`,
+`Edit(./docs/**)`, `WebFetch(domain:react.dev)`, `mcp__github` (todas las herramientas de un MCP).
+
+### `.gitignore`
+Vite ignora `*.local`, pero `settings.local.json` y `CLAUDE.local.md` no terminan en `.local`.
+Se añadieron a mano al `.gitignore`.
+
+### Modos de permisos (`Shift+Tab` los cambia)
+| Modo | Comportamiento |
+|------|----------------|
+| Normal | Pregunta antes de editar archivos o ejecutar comandos no permitidos |
+| Auto-accept edits | Edita archivos sin preguntar; los comandos siguen pasando por las reglas |
+| Plan mode | Solo lee y planifica, no modifica nada |
+
+Además, cuando Claude pide permiso y eliges *"Yes, and don't ask again"*, la regla se guarda
+automáticamente en `.claude/settings.local.json`.
+
+### Comandos útiles
+- `/permissions` → ver y editar las reglas activas y de dónde viene cada una.
+- `/config` → ajustes generales (tema, modelo, etc.).
+- `/status` → versión, modelo y archivos de configuración cargados.
+
+---
+
+*(Continúa en el Paso 5)*
