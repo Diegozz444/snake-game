@@ -420,6 +420,53 @@ La lógica sabe **qué** pasa en cada movimiento; el hook decide **cuándo** y l
 **Verificación:** script temporal que lanza acciones contra el `reducer` exportado y comprueba cada
 transición (ready → playing → paused → playing → gameOver → partida nueva). Lint sin errores.
 
+### 5c — Los componentes (`src/components/`, `App.jsx`, `index.css`)
+
+```
+App.jsx ── useSnakeGame() ──▶ { game, best, pressSpace }
+   ├── <HUD score best status onButton />   ← puntos, récord, botón
+   └── <Board game />                       ← cuadrícula 20×20 + mensaje superpuesto
+```
+
+| Archivo | Qué hace |
+|---------|----------|
+| `Board.jsx` | Pinta 400 `<div>` en un CSS Grid. Cada celda recibe su clase: `cell--head`, `cell--snake`, `cell--food` o ninguna. Muestra un mensaje encima según el estado (empezar, pausa, game over, victoria) |
+| `HUD.jsx` | Puntos, récord y un botón cuyo texto cambia según el estado (Empezar / Pausar / Reanudar / Jugar otra vez) |
+| `App.jsx` | Llama al hook y reparte los datos. No tiene lógica propia |
+| `index.css` | Estilo minimalista claro. Los colores son variables CSS en `:root`, fáciles de cambiar |
+
+Detalles:
+- **`Set` para el cuerpo**: en vez de recorrer la serpiente para cada una de las 400 celdas, se crea un
+  `Set` con las posiciones `"x,y"` y cada consulta es instantánea.
+- **`grid-template-columns: repeat(var(--size), 1fr)`**: el tamaño del tablero llega desde JS con una
+  variable CSS. Si cambias `BOARD_SIZE`, el grid se adapta solo.
+- **`aspect-ratio: 1` + `width: min(100%, 480px)`**: el tablero siempre es cuadrado y cabe en el móvil.
+- **Bug evitado en el botón**: tras hacer clic, el botón conserva el foco. Al pulsar Espacio, el navegador
+  lo "pulsaría" otra vez **y además** saltaría nuestro atajo de teclado: doble acción. Se soluciona con `blur()`.
+
+### Verificación (y un error por el camino)
+- `npm run lint` y `npm run build` ✅.
+- No hay navegador headless disponible, así que Claude renderizó `App` en Node con **Vite SSR**
+  (`renderToString`) y contó las celdas: 400 celdas, 1 cabeza, 2 de cuerpo, 1 comida, mensaje y botón correctos.
+- **Primer intento fallido:** `Cannot find package 'vite'`. El script estaba en la carpeta temporal y
+  Node buscaba los paquetes allí. Se arregló ejecutándolo con `node --input-type=module < script`
+  desde la carpeta del proyecto.
+
+> 💡 Así trabaja Claude Code: cuando algo falla, lee el error, entiende la causa y lo corrige.
+> Tú ves todo el proceso, errores incluidos.
+
+> ⚠️ **Limitación:** Claude todavía no puede *ver* el juego ni jugarlo. Eso se resuelve en el
+> **Paso 10** con un MCP de navegador (Playwright). Mientras tanto, la prueba visual la haces tú.
+
+### Prueba manual
+`npm run dev` → http://localhost:5173 y comprobar:
+- [ ] Una flecha o Espacio arranca la partida.
+- [ ] Flechas y WASD mueven la serpiente; no se puede dar media vuelta.
+- [ ] Al comer crece y suma un punto.
+- [ ] Chocar con la pared o consigo misma → "Game over".
+- [ ] Espacio pausa y reanuda; tras el game over, empieza otra partida.
+- [ ] El récord se mantiene al recargar la página.
+
 ---
 
-*(Continúa en el Paso 5c)*
+*(Continúa en el Paso 6)*
