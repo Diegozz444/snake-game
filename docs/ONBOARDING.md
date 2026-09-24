@@ -591,4 +591,84 @@ donde lo arrancas**, así que no veía nada del proyecto.
 
 ---
 
-*(Continúa en el Paso 8)*
+## Paso 8 — Subagentes
+
+### El problema
+Cuando Claude trabaja, todo lo que lee (archivos, salidas de comandos) se acumula en **una sola
+conversación**. Una revisión de código a fondo llena el contexto con archivos enteros que después ya no hacen
+falta. Además, quien ha escrito el código es el peor revisor: tiende a dar por bueno lo que acaba de hacer.
+
+### Qué es un subagente
+Un **subagente** es otro Claude al que el Claude principal le **delega una tarea**:
+- Tiene **su propio contexto**, limpio: no ve la conversación, solo el encargo que recibe.
+- Tiene **sus propias instrucciones** (un *system prompt*) y **sus propias herramientas**.
+- Al terminar devuelve **solo el resultado**. Todo lo que leyó por el camino se queda fuera de tu conversación.
+
+Es como pedirle a un compañero: *"revisa esto y dime qué ves"*. No necesitas saber qué archivos abrió,
+solo sus conclusiones.
+
+> 💡 Claude Code ya trae subagentes de serie, como `Explore` (buscar en el código) y `Plan` (diseñar un plan).
+> Los tuyos se añaden a esa lista.
+
+### Skill o subagente: ¿cuál uso?
+| | Skill (Paso 7) | Subagente |
+|---|----------------|-----------|
+| Dónde se ejecuta | En **tu** conversación | En un contexto **aparte** |
+| Qué añade | Instrucciones para Claude | Un "ayudante" con su papel, herramientas y modelo |
+| Tu contexto se llena con | Todo lo que haga | Solo el resumen final |
+| Ideal para | Flujos de trabajo (`/check`, `nueva-regla`) | Tareas que leen mucho y devuelven poco (revisar, investigar) |
+
+### Anatomía de un subagente
+Un archivo Markdown en `.claude/agents/` (proyecto, compartido por git) o `~/.claude/agents/` (todos tus proyectos):
+
+```markdown
+---
+name: revisor                      ← nombre del subagente
+description: Revisor de código...  ← Claude la lee para decidir cuándo delegarle trabajo
+tools: Read, Grep, Glob, Bash      ← herramientas permitidas (sin Edit ni Write: solo lee)
+model: sonnet                      ← modelo que usa (opcional; por defecto, el de la sesión)
+---
+Eres el revisor de código de un Snake...   ← su system prompt: papel, qué revisar, formato
+```
+
+> 💡 También puedes crearlos con el asistente **`/agents`**, que te guía y puede generar el texto por ti.
+
+### Nuestro subagente: `revisor`
+Archivo: `.claude/agents/revisor.md`. Decisiones de diseño:
+- **Solo lectura**: no tiene `Edit` ni `Write`. Opina y el Claude principal (o tú) decide qué arreglar.
+  Tiene `Bash` para lanzar `npm test`, `npm run lint` y `git diff`, y sus instrucciones le prohíben cambiar archivos.
+- **Conoce las reglas de la casa**: comprueba la arquitectura del `CLAUDE.md` (lógica pura en `src/game/`,
+  el hook como único puente, componentes sin reglas) y que cada función nueva tenga su test.
+- **Sabe qué revisar**: por defecto mira `git diff`; si no hay cambios, revisa todo `src/`.
+- **Respuesta con formato fijo**: veredicto, problemas con `archivo:línea` y un ejemplo de cuándo fallan,
+  y como mucho 3 sugerencias. Sin opiniones de gusto personal.
+- **`model: sonnet`**: revisar es leer mucho; un modelo más rápido y barato basta.
+
+### Cómo usarlo
+- Pídelo tú: *"usa el revisor para revisar los últimos cambios"*.
+- O deja que Claude lo use solo: la `description` dice *"úsalo después de cambiar código en src/"*.
+- Escribe `/agents` para ver y editar todos los subagentes.
+
+### Un tropiezo: "Agent type 'revisor' not found"
+Justo después de crear el archivo, Claude intentó usar el revisor y falló. Los subagentes se cargan
+**al arrancar la sesión**, así que uno recién creado no existe hasta que reinicias
+(`/exit` y `claude --continue`). Si lo creas con `/agents`, en cambio, está disponible al momento.
+
+### Resultado: la primera revisión
+Tras reiniciar, el revisor revisó todo `src/` en segundo plano (10 archivos) y devolvió solo su informe:
+
+- **Veredicto: ✅ bien.** Sin bugs. Tests y lint en verde.
+- **Qué comprobó**: los casos límite (paredes, cola, victoria, doble tecla rápida), que los intervalos y
+  listeners se limpian, que `localStorage` falla sin romper el juego y que se cumple la arquitectura del `CLAUDE.md`.
+- **Sugerencias menores**: un test que documente por qué dos giros rápidos opuestos (↑ y luego ↓) son seguros, y
+  que `Board.jsx` crea un `Set` nuevo en cada render (irrelevante en un tablero de 20×20).
+
+Los 10 archivos que leyó no entraron en la conversación principal: solo llegó el resumen. Esa es la ventaja
+del subagente.
+
+> 💡 Que el revisor diga "bien" no significa que el código sea perfecto: significa que no encontró nada.
+> Su valor aparece al revisar **cambios nuevos**, justo después de tocar el código.
+
+---
+
+*(Continúa en el Paso 9)*
