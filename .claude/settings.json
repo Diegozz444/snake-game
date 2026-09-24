@@ -17,5 +17,20 @@
       "Read(./.env)",
       "Read(./.env.*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/lint-archivo.mjs\"",
+            "timeout": 30,
+            "statusMessage": "Pasando oxlint..."
+          }
+        ]
+      }
+    ]
   }
 }

@@ -671,4 +671,88 @@ del subagente.
 
 ---
 
-*(Continúa en el Paso 9)*
+## Paso 9 — Hooks
+
+### El problema
+El `CLAUDE.md` dice *"`npm run lint` debe pasar"*, pero eso es una **instrucción**: Claude casi siempre la sigue,
+pero puede olvidarla. Y si solo pasa el lint al final, los errores se acumulan.
+
+### Qué es un hook
+Un **hook** es un comando que **Claude Code** (el programa, no el modelo) ejecuta automáticamente cuando
+ocurre un evento. No depende de que Claude se acuerde: **siempre** se ejecuta.
+
+| | Instrucción (`CLAUDE.md`, skill) | Hook |
+|---|------------------|------|
+| Quién la cumple | Claude, si se acuerda | Claude Code, siempre |
+| Qué es | Texto en Markdown | Un comando (script) |
+| Ideal para | Criterio, forma de trabajar | Reglas que no deben fallar nunca |
+
+### Eventos más útiles
+| Evento | Cuándo salta | Ejemplo |
+|--------|--------------|---------|
+| `PreToolUse` | **Antes** de usar una herramienta (puede bloquearla) | Impedir editar `package.json` |
+| `PostToolUse` | **Después** de usar una herramienta | Pasar el lint o formatear al editar |
+| `UserPromptSubmit` | Al enviar tú un mensaje | Añadir contexto automáticamente |
+| `Stop` | Cuando Claude termina de responder | Avisar con un sonido |
+| `SessionStart` | Al abrir la sesión | Cargar información del proyecto |
+
+El `matcher` filtra por herramienta: `"Edit|Write"` = solo cuando Claude edita o crea archivos.
+
+### Cómo se comunica un hook con Claude
+- Recibe por **stdin** un JSON con lo que ha pasado (`tool_name`, `tool_input.file_path`...).
+- Responde con su **código de salida**:
+  - `0` → todo bien, sigue.
+  - `2` → problema: lo que el hook escriba en **stderr** se le enseña a Claude, que reacciona.
+  - Otro código → error del propio hook; se avisa, pero no se frena a Claude.
+
+### Nuestro hook: lint al editar
+En `.claude/settings.json` (compartido por git):
+
+```json
+"hooks": {
+  "PostToolUse": [{
+    "matcher": "Edit|Write",
+    "hooks": [{
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/lint-archivo.mjs\"",
+      "timeout": 30,
+      "statusMessage": "Pasando oxlint..."
+    }]
+  }]
+}
+```
+
+El script `.claude/hooks/lint-archivo.mjs`:
+1. Lee el JSON de stdin y saca el archivo editado.
+2. Si no es un `.js`/`.jsx` de `src/`, sale con `0` (no hace nada con docs, CSS, etc.).
+3. Pasa `oxlint --deny-warnings` **solo a ese archivo** (rápido: milisegundos).
+4. Si hay problemas, los escribe en stderr y sale con `2`.
+
+Decisiones:
+- **En Node, no en bash**: el ejemplo típico usa `jq` para leer el JSON, pero no estaba instalado. Node ya lo
+  tiene el proyecto, así que no se añade nada.
+- **`$CLAUDE_PROJECT_DIR`**: variable que Claude Code rellena con la carpeta del proyecto, para que funcione
+  desde cualquier subcarpeta.
+- **Lint sí, tests no**: el lint de un archivo tarda milisegundos; los tests son más lentos y además fallan a
+  propósito a mitad de trabajo (test primero, en la skill `nueva-regla`). Los tests siguen en `/check`.
+- **`--deny-warnings`**: sin él, oxlint da los avisos pero sale con `0` y el hook no frenaría nada.
+
+### La prueba
+1. **A mano**: se le pasó al script un JSON falso por stdin con un archivo limpio (`exit 0`), uno de `docs/`
+   (`exit 0`, ignorado) y uno con una variable sin usar (`exit 2` y el mensaje).
+2. **En vivo**: Claude creó `src/prueba-hook.js` con una variable sin usar. Justo después de escribirlo recibió:
+   ```
+   PostToolUse:Write hook blocking error: oxlint encontró problemas en src/prueba-hook.js. Corrígelos:
+   src/prueba-hook.js:1:7: warning eslint(no-unused-vars): Variable 'noUsada' is declared but never used.
+   ```
+   Lo corrigió, el hook ya no dijo nada, y se borró el archivo de prueba.
+
+> 💡 **`/hooks`** muestra los hooks activos. Si un hook no salta, ábrelo una vez (recarga la configuración)
+> o reinicia la sesión.
+
+> ⚠️ Un hook ejecuta comandos en tu máquina **sin preguntar**. Revisa siempre los hooks de un proyecto
+> ajeno antes de abrirlo con Claude Code.
+
+---
+
+*(Continúa en el Paso 10)*
